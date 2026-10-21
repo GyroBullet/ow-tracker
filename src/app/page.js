@@ -1,5 +1,5 @@
-import RecordsManager from '@/components/RecordsManager';
+import PlayerManager from '@/components/PlayerManager';
 
 export default function HomePage() {
-  return <RecordsManager />;
+  return <PlayerManager />;
 }
