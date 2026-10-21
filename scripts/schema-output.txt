@@ -1,0 +1,129 @@
+CREATE TABLE GAME_MODE (
+    Mode_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+    Mode_Name TEXT NOT NULL
+  );
+
+CREATE TABLE HERO (
+    Hero_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+    Role_ID INTEGER,
+    Hero_Name TEXT NOT NULL,
+    Release_Date TEXT,
+    Difficulty_Rating INTEGER,
+    Base_Health INTEGER,
+    FOREIGN KEY(Role_ID) REFERENCES ROLE(Role_ID)
+  );
+
+CREATE TABLE MATCH (
+    Game_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+    Mode_ID INTEGER,
+    Map_Name TEXT,
+    Server_Datacenter TEXT,
+    Duration INTEGER,
+    Timestamp TEXT,
+    FOREIGN KEY(Mode_ID) REFERENCES GAME_MODE(Mode_ID)
+  );
+
+CREATE TABLE MATCH_HERO_PERFORMANCE (
+    Player_ID INTEGER,
+    Game_ID INTEGER,
+    Hero_ID INTEGER,
+    Time_Played_On_Hero INTEGER,
+    Damage_Done_On_Hero INTEGER,
+    Ultimates_Earned INTEGER,
+    Hero_Specific_Stat_Value INTEGER,
+    PRIMARY KEY (Player_ID, Game_ID, Hero_ID),
+    FOREIGN KEY(Player_ID) REFERENCES PLAYER(Player_ID),
+    FOREIGN KEY(Game_ID) REFERENCES MATCH(Game_ID),
+    FOREIGN KEY(Hero_ID) REFERENCES HERO(Hero_ID)
+  );
+
+CREATE TABLE PLAYER (
+    Player_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+    Username TEXT NOT NULL,
+    Discriminator INTEGER NOT NULL,
+    Email_Address TEXT,
+    Account_Creation_Date TEXT,
+    Default_Region TEXT,
+    Endorsement_Level INTEGER,
+    Is_Banned BOOLEAN
+  );
+
+CREATE TABLE PLAYER_MATCH_STATS (
+    Player_ID INTEGER,
+    Game_ID INTEGER,
+    Result TEXT,
+    Damage_Dealt INTEGER,
+    Healing_Done INTEGER,
+    Eliminations INTEGER,
+    Deaths INTEGER,
+    Assists INTEGER,
+    Objective_Time_Seconds INTEGER,
+    Damage_Mitigated INTEGER,
+    Ping_Average_MS INTEGER,
+    PRIMARY KEY (Player_ID, Game_ID),
+    FOREIGN KEY(Player_ID) REFERENCES PLAYER(Player_ID),
+    FOREIGN KEY(Game_ID) REFERENCES MATCH(Game_ID)
+  );
+
+CREATE TABLE PLAYER_MODE_STATS (
+    Player_ID INTEGER,
+    Mode_ID INTEGER,
+    PRIMARY KEY (Player_ID, Mode_ID),
+    FOREIGN KEY(Player_ID) REFERENCES PLAYER(Player_ID),
+    FOREIGN KEY(Mode_ID) REFERENCES GAME_MODE(Mode_ID)
+  );
+
+CREATE TABLE PLAYER_SEASON_RANK (
+    Player_ID INTEGER,
+    Season_ID INTEGER,
+    Role_ID INTEGER,
+    Skill_Tier TEXT,
+    Division INTEGER,
+    Peak_Tier TEXT,
+    Peak_Division INTEGER,
+    PRIMARY KEY (Player_ID, Season_ID, Role_ID),
+    FOREIGN KEY(Player_ID) REFERENCES PLAYER(Player_ID),
+    FOREIGN KEY(Season_ID) REFERENCES SEASON(Season_ID),
+    FOREIGN KEY(Role_ID) REFERENCES ROLE(Role_ID)
+  );
+
+CREATE TABLE ROLE (
+    Role_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+    Role_Name TEXT NOT NULL
+  );
+
+CREATE TABLE SEASON (
+    Season_ID INTEGER PRIMARY KEY AUTOINCREMENT,
+    Season_Number INTEGER,
+    Theme_Name TEXT,
+    Base_Patch_Version TEXT,
+    Start_Date TEXT,
+    End_Date TEXT
+  );
+
+CREATE TABLE sqlite_sequence(name,seq);
+
+
+--- Sample Players ---
+[
+  {
+    "Player_ID": 1,
+    "Username": "farmerofaura01",
+    "Discriminator": 1337,
+    "Email_Address": "farmer@example.com",
+    "Account_Creation_Date": "2023-01-01",
+    "Default_Region": "NA",
+    "Endorsement_Level": 4,
+    "Is_Banned": 0
+  },
+  {
+    "Player_ID": 2,
+    "Username": "fdjhjdfhd",
+    "Discriminator": 1233,
+    "Email_Address": "theabhaybhat2007@gmail.com",
+    "Account_Creation_Date": "2026-10-21",
+    "Default_Region": "ASIA",
+    "Endorsement_Level": 1,
+    "Is_Banned": 0
+  }
+]

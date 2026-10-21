@@ -1,117 +1,109 @@
-import Link from 'next/link';
-import prisma from '@/lib/prisma';
+import { NextResponse } from 'next/server';
+import { getDb } from '@/lib/db';
 
-export default async function PlayerDetailPage({ params }) {
-  const { playerId } = await params;
+export async function GET(request) {
+  try {
+    const db = getDb();
+    const { searchParams } = new URL(request.url);
+    const search = (searchParams.get('search') || '').trim();
 
-  const player = await prisma.player.findUnique({
-    where: { playerID: playerId },
-    include: {
-      matchStats: true,
-      seasonRanks: { include: { season: true } },
-      modeStats: { include: { match: true } },
-    },
-  });
+    let players;
+    if (search) {
+      players = db.prepare(`
+        SELECT * FROM PLAYER
+        WHERE Username LIKE ? COLLATE NOCASE OR CAST(Player_ID AS TEXT) LIKE ?
+        ORDER BY Player_ID ASC
+      `).all(`%${search}%`, `%${search}%`);
+    } else {
+      players = db.prepare('SELECT * FROM PLAYER ORDER BY Player_ID ASC').all();
+    }
 
-  if (!player) {
-    return (
-      <main style={{ maxWidth: 960, margin: '40px auto', padding: 20 }}>
-        <h1>Player not found</h1>
-        <Link href="/">Back to dashboard</Link>
-      </main>
-    );
+    // Map to camelCase keys for the admin dashboard
+    const mapped = players.map(p => ({
+      playerID: p.Player_ID,
+      username: p.Username,
+      discriminator: p.Discriminator,
+      region: p.Default_Region,
+      settling: p.Email_Address,
+      date: p.Account_Creation_Date,
+      endorsementLevel: p.Endorsement_Level,
+      isBanned: p.Is_Banned,
+    }));
+
+    return NextResponse.json({ players: mapped });
+  } catch (error) {
+    console.error('GET /api/players error:', error);
+    return NextResponse.json({ error: 'Failed to query database', details: error.message }, { status: 500 });
   }
-
-  const totalMatches = player.matchStats.length;
-  const totalKills = player.matchStats.reduce((sum, item) => sum + (item.kills || 0), 0);
-  const totalDeaths = player.matchStats.reduce((sum, item) => sum + (item.deaths || 0), 0);
-  const totalHours = player.modeStats.reduce((sum, item) => sum + (item.timePlayedHours || 0), 0);
-
-  return (
-    <main style={{ maxWidth: 1200, margin: '40px auto', padding: 20, color: '#f5f5f5' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <p style={{ color: '#f99e1a', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 8, fontWeight: 700 }}>Player Profile</p>
-          <h1 style={{ margin: 0, fontSize: '2.4rem' }}>{player.username}</h1>
-        </div>
-        <Link href="/" style={{ color: '#f99e1a', fontWeight: 700 }}>← Back to dashboard</Link>
-      </div>
-
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
-        <StatCard label="Region" value={player.region || '—'} />
-        <StatCard label="Settling" value={player.settling || '—'} />
-        <StatCard label="Matches" value={String(totalMatches)} />
-        <StatCard label="Kills" value={String(totalKills)} />
-        <StatCard label="Deaths" value={String(totalDeaths)} />
-        <StatCard label="Hours Played" value={String(totalHours.toFixed(1))} />
-      </section>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 20 }}>
-        <Panel title="Basic Info">
-          <InfoRow label="Username" value={player.username} />
-          <InfoRow label="Discriminator" value={player.discriminator || '—'} />
-          <InfoRow label="Region" value={player.region || '—'} />
-          <InfoRow label="Settling" value={player.settling || '—'} />
-          <InfoRow label="Joined" value={player.date ? new Date(player.date).toLocaleDateString() : '—'} />
-        </Panel>
-
-        <Panel title="Season Rankings">
-          {player.seasonRanks.length === 0 ? (
-            <p style={{ color: '#8b8f98' }}>No season ranks yet.</p>
-          ) : (
-            <div style={{ display: 'grid', gap: 10 }}>
-              {player.seasonRanks.map((rank) => (
-                <div key={rank.id} style={{ padding: 12, borderRadius: 10, background: '#171a1f', border: '1px solid #2a2d32' }}>
-                  <strong>{rank.season?.seasonNo ?? 'Season'} </strong>
-                  <div style={{ color: '#c7cbd3' }}>{rank.rank} / {rank.division} / Skill Tier {rank.skillTier}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Panel>
-
-        <Panel title="Match Stats">
-          {player.matchStats.length === 0 ? (
-            <p style={{ color: '#8b8f98' }}>No match stats yet.</p>
-          ) : (
-            <div style={{ display: 'grid', gap: 10 }}>
-              {player.matchStats.map((stat) => (
-                <div key={stat.id} style={{ padding: 12, borderRadius: 10, background: '#171a1f', border: '1px solid #2a2d32' }}>
-                  <div style={{ fontWeight: 700 }}>Game {stat.gameID}</div>
-                  <div style={{ color: '#c7cbd3' }}>Kills: {stat.kills} | Deaths: {stat.deaths} | Healing: {stat.healingDone}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Panel>
-      </div>
-    </main>
-  );
 }
 
-function StatCard({ label, value }) {
-  return (
-    <div style={{ background: '#111317', border: '1px solid #2a2d32', borderRadius: 16, padding: 18 }}>
-      <div style={{ color: '#8b8f98', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</div>
-      <div style={{ marginTop: 8, fontSize: '1.8rem', fontWeight: 700 }}>{value}</div>
-    </div>
-  );
+export async function POST(request) {
+  try {
+    const db = getDb();
+    const body = await request.json();
+    const username = (body.username || '').trim();
+
+    if (!username) {
+      return NextResponse.json({ error: 'Username is required.' }, { status: 400 });
+    }
+
+    const info = db.prepare(`
+      INSERT INTO PLAYER (Username, Discriminator, Email_Address, Account_Creation_Date, Default_Region, Endorsement_Level, Is_Banned)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      username,
+      Number(body.discriminator || 0),
+      body.settling || body.email || '',
+      body.date || new Date().toISOString(),
+      body.region || '',
+      Number(body.endorsementLevel || 1),
+      0
+    );
+
+    return NextResponse.json({ success: true, playerID: info.lastInsertRowid }, { status: 201 });
+  } catch (error) {
+    console.error('POST /api/players error:', error);
+    return NextResponse.json({ error: 'Failed to create record', details: error.message }, { status: 500 });
+  }
 }
 
-function Panel({ title, children }) {
-  return (
-    <section style={{ background: '#111317', border: '1px solid #2a2d32', borderRadius: 16, padding: 18 }}>
-      <h2 style={{ marginTop: 0, marginBottom: 12 }}>{title}</h2>
-      {children}
-    </section>
-  );
+export async function PUT(request) {
+  try {
+    const db = getDb();
+    const body = await request.json();
+    const playerID = Number(body.playerID);
+
+    db.prepare(`
+      UPDATE PLAYER SET Username = ?, Discriminator = ?, Default_Region = ?, Email_Address = ?, Account_Creation_Date = ?
+      WHERE Player_ID = ?
+    `).run(
+      body.username || undefined,
+      body.discriminator !== undefined ? Number(body.discriminator) : undefined,
+      body.region || undefined,
+      body.settling || body.email || undefined,
+      body.date || undefined,
+      playerID
+    );
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('PUT /api/players error:', error);
+    return NextResponse.json({ error: 'Failed to update record', details: error.message }, { status: 500 });
+  }
 }
 
-function InfoRow({ label, value }) {
-  return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, padding: '10px 0', borderBottom: '1px solid #272b31' }}>
-      <span style={{ color: '#8b8f98' }}>{label}</span>
-      <span style={{ fontWeight: 600 }}>{value}</span>
-    </div>
-  );
+export async function DELETE(request) {
+  try {
+    const db = getDb();
+    const { searchParams } = new URL(request.url);
+    const playerID = searchParams.get('id');
+
+    if (!playerID) return NextResponse.json({ error: 'Player ID is required.' }, { status: 400 });
+
+    db.prepare('DELETE FROM PLAYER WHERE Player_ID = ?').run(Number(playerID));
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('DELETE /api/players error:', error);
+    return NextResponse.json({ error: 'Failed to delete record', details: error.message }, { status: 500 });
+  }
 }

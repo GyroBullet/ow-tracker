@@ -1,48 +1,94 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getDb } from '@/lib/db';
 
 export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  const search = (searchParams.get('search') || '').trim();
+  try {
+    const db = getDb();
+    const { searchParams } = new URL(request.url);
+    const search = (searchParams.get('search') || '').trim();
 
-  const roles = await prisma.role.findMany({
-    where: search ? { roleName: { contains: search, mode: 'insensitive' } } : undefined,
-    orderBy: { roleName: 'asc' },
-  });
+    let seasons;
+    if (search) {
+      seasons = db.prepare(`
+        SELECT * FROM SEASON
+        WHERE CAST(Season_Number AS TEXT) LIKE ? OR Theme_Name LIKE ?
+        ORDER BY Season_Number ASC
+      `).all(`%${search}%`, `%${search}%`);
+    } else {
+      seasons = db.prepare('SELECT * FROM SEASON ORDER BY Season_Number ASC').all();
+    }
 
-  return NextResponse.json({ roles });
+    return NextResponse.json({ seasons });
+  } catch (error) {
+    console.error('GET /api/seasons error:', error);
+    return NextResponse.json({ error: 'Failed to query database', details: error.message }, { status: 500 });
+  }
 }
 
 export async function POST(request) {
-  const body = await request.json();
-  const roleName = (body.roleName || '').trim();
+  try {
+    const db = getDb();
+    const body = await request.json();
+    const seasonNo = Number(body.seasonNo || 0);
 
-  if (!roleName) {
-    return NextResponse.json({ error: 'Role name is required.' }, { status: 400 });
+    if (!seasonNo) {
+      return NextResponse.json({ error: 'Season number is required.' }, { status: 400 });
+    }
+
+    const info = db.prepare(`
+      INSERT INTO SEASON (Season_Number, Theme_Name, Base_Patch_Version, Start_Date, End_Date)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+      seasonNo,
+      body.themeName || '',
+      body.basePatchVersion || '',
+      body.startDate || '',
+      body.endDate || ''
+    );
+
+    return NextResponse.json({ success: true, seasonID: info.lastInsertRowid }, { status: 201 });
+  } catch (error) {
+    console.error('POST /api/seasons error:', error);
+    return NextResponse.json({ error: 'Failed to create record', details: error.message }, { status: 500 });
   }
-
-  const role = await prisma.role.create({ data: { roleName } });
-  return NextResponse.json({ role }, { status: 201 });
 }
 
 export async function PUT(request) {
-  const body = await request.json();
-  const roleID = body.roleID;
+  try {
+    const db = getDb();
+    const body = await request.json();
+    const seasonID = Number(body.seasonID);
 
-  const role = await prisma.role.update({
-    where: { roleID },
-    data: { roleName: body.roleName ? String(body.roleName).trim() : undefined },
-  });
+    db.prepare(`
+      UPDATE SEASON SET Season_Number = ?, Theme_Name = ?, Start_Date = ?, End_Date = ?
+      WHERE Season_ID = ?
+    `).run(
+      body.seasonNo !== undefined ? Number(body.seasonNo) : undefined,
+      body.themeName || undefined,
+      body.startDate || undefined,
+      body.endDate || undefined,
+      seasonID
+    );
 
-  return NextResponse.json({ role });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('PUT /api/seasons error:', error);
+    return NextResponse.json({ error: 'Failed to update record', details: error.message }, { status: 500 });
+  }
 }
 
 export async function DELETE(request) {
-  const { searchParams } = new URL(request.url);
-  const roleID = searchParams.get('id');
+  try {
+    const db = getDb();
+    const { searchParams } = new URL(request.url);
+    const seasonID = searchParams.get('id');
 
-  if (!roleID) return NextResponse.json({ error: 'Role ID is required.' }, { status: 400 });
+    if (!seasonID) return NextResponse.json({ error: 'Season ID is required.' }, { status: 400 });
 
-  await prisma.role.delete({ where: { roleID } });
-  return NextResponse.json({ success: true });
+    db.prepare('DELETE FROM SEASON WHERE Season_ID = ?').run(Number(seasonID));
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('DELETE /api/seasons error:', error);
+    return NextResponse.json({ error: 'Failed to delete record', details: error.message }, { status: 500 });
+  }
 }

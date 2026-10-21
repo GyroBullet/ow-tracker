@@ -81,7 +81,25 @@ export default async function ProfilePage({ params, searchParams }) {
           <Activity size={16} className="text-muted" />
           <input type="text" placeholder="Search Player" style={{background:'transparent', border:'none', color:'white', outline:'none'}} />
         </div>
-        <SyncButton username={player.Username} />
+        <div style={{display:'flex', gap:'10px', alignItems:'center'}}>
+          <Link href={`/profile/${player.Username}/edit`} style={{
+            background: 'linear-gradient(135deg, #f99e1a, #e88b0d)',
+            color: '#111',
+            padding: '0.5rem 1.2rem',
+            borderRadius: '8px',
+            fontWeight: 700,
+            fontSize: '0.9rem',
+            textDecoration: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            boxShadow: '0 2px 12px rgba(249,158,26,0.3)',
+            transition: 'all 0.2s',
+          }}>
+            ✏️ Edit Profile
+          </Link>
+          <SyncButton username={player.Username} />
+        </div>
       </div>
 
       {/* Profile Banner */}

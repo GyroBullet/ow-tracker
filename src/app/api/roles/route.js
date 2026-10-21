@@ -1,66 +1,74 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { getDb } from '@/lib/db';
 
 export async function GET(request) {
-  const { searchParams } = new URL(request.url);
-  const search = (searchParams.get('search') || '').trim();
+  try {
+    const db = getDb();
+    const { searchParams } = new URL(request.url);
+    const search = (searchParams.get('search') || '').trim();
 
-  const heroes = await prisma.hero.findMany({
-    where: search
-      ? {
-          OR: [{ heroName: { contains: search, mode: 'insensitive' } }],
-        }
-      : undefined,
-    orderBy: { heroName: 'asc' },
-    include: { role: true },
-  });
+    let roles;
+    if (search) {
+      roles = db.prepare('SELECT * FROM ROLE WHERE Role_Name LIKE ? ORDER BY Role_Name ASC').all(`%${search}%`);
+    } else {
+      roles = db.prepare('SELECT * FROM ROLE ORDER BY Role_Name ASC').all();
+    }
 
-  return NextResponse.json({ heroes });
+    return NextResponse.json({ roles });
+  } catch (error) {
+    console.error('GET /api/roles error:', error);
+    return NextResponse.json({ error: 'Failed to query database', details: error.message }, { status: 500 });
+  }
 }
 
 export async function POST(request) {
-  const body = await request.json();
-  const heroName = (body.heroName || '').trim();
+  try {
+    const db = getDb();
+    const body = await request.json();
+    const roleName = (body.roleName || '').trim();
 
-  if (!heroName) {
-    return NextResponse.json({ error: 'Hero name is required.' }, { status: 400 });
+    if (!roleName) {
+      return NextResponse.json({ error: 'Role name is required.' }, { status: 400 });
+    }
+
+    const info = db.prepare('INSERT INTO ROLE (Role_Name) VALUES (?)').run(roleName);
+    return NextResponse.json({ success: true, roleID: info.lastInsertRowid }, { status: 201 });
+  } catch (error) {
+    console.error('POST /api/roles error:', error);
+    return NextResponse.json({ error: 'Failed to create record', details: error.message }, { status: 500 });
   }
-
-  const hero = await prisma.hero.create({
-    data: {
-      heroName,
-      releaseDate: body.releaseDate ? new Date(body.releaseDate) : null,
-      difficultyRating: body.difficultyRating !== undefined ? Number(body.difficultyRating) : null,
-      roleID: body.roleID || null,
-    },
-  });
-
-  return NextResponse.json({ hero }, { status: 201 });
 }
 
 export async function PUT(request) {
-  const body = await request.json();
-  const heroID = body.heroID;
+  try {
+    const db = getDb();
+    const body = await request.json();
+    const roleID = Number(body.roleID);
 
-  const hero = await prisma.hero.update({
-    where: { heroID },
-    data: {
-      heroName: body.heroName ? String(body.heroName).trim() : undefined,
-      releaseDate: body.releaseDate ? new Date(body.releaseDate) : undefined,
-      difficultyRating: body.difficultyRating !== undefined ? Number(body.difficultyRating) : undefined,
-      roleID: body.roleID || null,
-    },
-  });
+    db.prepare('UPDATE ROLE SET Role_Name = ? WHERE Role_ID = ?').run(
+      body.roleName ? String(body.roleName).trim() : undefined,
+      roleID
+    );
 
-  return NextResponse.json({ hero });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('PUT /api/roles error:', error);
+    return NextResponse.json({ error: 'Failed to update record', details: error.message }, { status: 500 });
+  }
 }
 
 export async function DELETE(request) {
-  const { searchParams } = new URL(request.url);
-  const heroID = searchParams.get('id');
+  try {
+    const db = getDb();
+    const { searchParams } = new URL(request.url);
+    const roleID = searchParams.get('id');
 
-  if (!heroID) return NextResponse.json({ error: 'Hero ID is required.' }, { status: 400 });
+    if (!roleID) return NextResponse.json({ error: 'Role ID is required.' }, { status: 400 });
 
-  await prisma.hero.delete({ where: { heroID } });
-  return NextResponse.json({ success: true });
+    db.prepare('DELETE FROM ROLE WHERE Role_ID = ?').run(Number(roleID));
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('DELETE /api/roles error:', error);
+    return NextResponse.json({ error: 'Failed to delete record', details: error.message }, { status: 500 });
+  }
 }
