@@ -1,5 +1,5 @@
-import PlayerManager from '@/components/PlayerManager';
+import AdminDashboard from '@/components/AdminDashboard';
 
 export default function HomePage() {
-  return <PlayerManager />;
+  return <AdminDashboard />;
 }
