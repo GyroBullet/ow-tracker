@@ -1,0 +1,117 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Player {
+  playerID      String              @id @default(uuid()) @map("player_id")
+  username      String
+  discriminator String?
+  region        String?
+  settling      String?
+  date          DateTime?
+  matchStats    PlayerMatchStats[]
+  seasonRanks   PlayerSeasonRank[]
+  modeStats     PlayerModeStats[]
+
+  @@map("player")
+}
+
+model Match {
+  gameID       String                @id @default(uuid()) @map("game_id")
+  mapName      String                @map("map_name")
+  duration     Int
+  timestamp    DateTime
+  playerStats  PlayerMatchStats[]
+  heroPerf     MatchHeroPerformance[]
+  modeStats    PlayerModeStats[]
+
+  @@map("match")
+}
+
+model Hero {
+  heroID           String                @id @default(uuid()) @map("hero_id")
+  heroName         String                @map("hero_name")
+  releaseDate      DateTime?             @map("release_date")
+  difficultyRating Int?                  @map("difficulty_rating")
+  roleID           String?               @map("role_id")
+  role             Role?                 @relation(fields: [roleID], references: [roleID])
+  performances     MatchHeroPerformance[]
+
+  @@map("hero")
+}
+
+model Role {
+  roleID   String @id @default(uuid()) @map("role_id")
+  roleName String @map("role_name")
+  heroes   Hero[]
+
+  @@map("role")
+}
+
+model Season {
+  seasonID   String             @id @default(uuid()) @map("season_id")
+  seasonNo   Int                @map("season_no")
+  startDate  DateTime           @map("start_date")
+  endDate    DateTime           @map("end_date")
+  ranks      PlayerSeasonRank[]
+
+  @@map("season")
+}
+
+model PlayerMatchStats {
+  id           String @id @default(uuid())
+  playerID     String @map("player_id")
+  gameID       String @map("game_id")
+  kills        Int
+  deaths       Int
+  healingDone  Float  @map("healing_done")
+  dmgMitigated Float  @map("dmg_mitigated")
+  jumpAttempts Int    @map("jump_attempts")
+  player       Player @relation(fields: [playerID], references: [playerID])
+  match        Match  @relation(fields: [gameID], references: [gameID])
+
+  @@map("player_match_stats")
+}
+
+model MatchHeroPerformance {
+  id                       String @id @default(uuid())
+  gameID                   String @map("game_id")
+  heroID                   String @map("hero_id")
+  weaponAccuracyPercentage Float  @map("weapon_accuracy_percentage")
+  dmgDoneOnHero            Float  @map("dmg_done_on_hero")
+  ultimateEarned           Int    @map("ultimate_earned")
+  heroSpecificStatValue    Float  @map("hero_specific_stat_value")
+  match                    Match  @relation(fields: [gameID], references: [gameID])
+  hero                     Hero   @relation(fields: [heroID], references: [heroID])
+
+  @@map("match_hero_performance")
+}
+
+model PlayerSeasonRank {
+  id       String @id @default(uuid())
+  playerID String @map("player_id")
+  seasonID String @map("season_id")
+  rank     String
+  division String
+  skillTier Int   @map("skill_tier")
+  player   Player @relation(fields: [playerID], references: [playerID])
+  season   Season @relation(fields: [seasonID], references: [seasonID])
+
+  @@map("player_season_rank")
+}
+
+model PlayerModeStats {
+  id              String @id @default(uuid())
+  playerID        String @map("player_id")
+  gameID          String @map("game_id")
+  timePlayedHours Float  @map("time_played_hours")
+  player          Player @relation(fields: [playerID], references: [playerID])
+  match           Match  @relation(fields: [gameID], references: [gameID])
+
+  @@map("player_mode_stats")
+}
